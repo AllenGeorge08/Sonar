@@ -101,3 +101,42 @@ class GetTokenAccountsResult(BaseModel):
    accounts: list[TokenAccountEntry]
    paginationKey: Optional[str] = None
    count: int
+
+
+#GetTx
+class Transaction_Message(BaseModel):
+    accountKeys: list[str]
+    header: dict[str,int]
+    instructions: list[dict]
+    
+class Transaction_Two(BaseModel):
+    message: TransactionMessage
+    signatures: list[str]
+
+class GetTxMeta(BaseModel):
+    err: Optional[dict]= None
+    fee: int 
+    inner_instructions: list
+
+
+class GetTransactionResult(BaseModel):
+    slot: int 
+    transaction: Transaction_Two
+    transaction_meta: Optional[GetTxMeta] = None
+
+
+
+#GetSignatureStatus
+class Signature(BaseModel):
+    signature_slot: int 
+    confirmations: Optional[int] = None 
+    err: Optional[str] = None 
+    confirmation_status: dict 
+
+class GetSignatureResult(BaseModel):
+    current_slot: int 
+    signature: Signature
+
+class PrioritizationFee(BaseModel):
+    current_slot: int
+    prioritization_fee: int 
