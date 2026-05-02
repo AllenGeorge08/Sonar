@@ -17,8 +17,7 @@ class Balance(BaseModel):
 
 #getSignaturesforAddress response time
 class SignatureInfo(BaseModel):
-    signature: str 
-    slot: int 
+    signatures: list[str] 
     err: Optional[dict] = None 
     memo: Optional[int] = None 
     blockTime: Optional[int] = None 
