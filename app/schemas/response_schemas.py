@@ -140,3 +140,38 @@ class GetSignatureResult(BaseModel):
 class PrioritizationFee(BaseModel):
     current_slot: int
     prioritization_fee: int 
+
+
+
+class TokenSupplyValue(BaseModel):
+    amount: str
+    decimals: int
+    uiAmount: float
+    uiAmountString: str
+
+class GetTokenSupplyResult(BaseModel):
+    slot: int
+    value: TokenSupplyValue
+
+class LargestAccount(BaseModel):
+    address: str
+    amount: str
+    decimals: int
+    uiAmount: float
+    uiAmountString: str
+
+class GetTokenLargestAccountsResult(BaseModel):
+    slot: int
+    value: list[LargestAccount]
+
+
+class Slot(BaseModel):
+    slot_number: int
+
+class EpochInfo(BaseModel):
+    absolute_slot: int 
+    blockHeight: int
+    epoch: int
+    slotIndex: int
+    slotsInEpoch: int
+    transactionCount: int
