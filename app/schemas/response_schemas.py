@@ -28,6 +28,7 @@ class SignatureInfo(BaseModel):
 class TransactionMessage(BaseModel):
     accountKeys: list[str]
     instructions: list[dict]
+    header: Optional[dict[str, int]] = None
 
 
 class Transaction(BaseModel):
@@ -37,7 +38,7 @@ class Transaction(BaseModel):
 
 class TransactionMeta(BaseModel):
     fee: int 
-    preBalance: list[int]
+    preBalances: list[int]
     postBalances: list[int]
 
 

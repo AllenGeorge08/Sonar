@@ -1,8 +1,20 @@
 from dotenv import load_dotenv
 import os 
-from  app.schemas.response_schemas import GetTransactionsResult,BalanceResult,AccountInfo,TokenAccountBalance, GetTokenAccountsResult,SignatureInfo,AccountInfo,TokenAccountBalance,Balance
+from app.schemas.response_schemas import (
+    GetTransactionsResult,
+    BalanceResult,
+    AccountInfo,
+    TokenAccountBalance,
+    GetTokenAccountsResult,
+    SignatureInfo,
+    Balance,
+    TransactionData,
+    Transaction,
+    TransactionMessage,
+    TransactionMeta,
+)
 import requests
-from fastapi import APIRouter,HTTPException,status
+from fastapi import APIRouter, HTTPException, Query, status
 import json 
 load_dotenv()
 
@@ -15,14 +27,14 @@ except:
 router = APIRouter(prefix="/api/v1/wallet",tags=["issues"])
 
 @router.get("/{owner}/account-info")
-def get_account_info(owner_address: str) -> AccountInfo:
+def get_account_info(owner: str) -> AccountInfo:
     url = f"https://devnet.helius-rpc.com/?api-key={api_key}"
 
     payload = {
         "jsonrpc": "2.0",
         "id": 1,
         "method": "getAccountInfo",
-        "params": [owner_address, { "encoding": "base58" }]
+        "params": [owner, {"encoding": "base58"}]
     }
     headers = {"Content-Type": "application/json"}
 
@@ -35,7 +47,13 @@ def get_account_info(owner_address: str) -> AccountInfo:
     executable = data["result"]['value']['executable']
     lamports = data["result"]['value']['lamports']
     space = data["result"]['value']['space']
-    return AccountInfo(slot=slot,lamports=lamports,owner_address=owner_address,is_executable=executable,space=space)
+    return AccountInfo(
+        slot=slot,
+        lamports=lamports,
+        owner_address=owner,
+        is_executable=executable,
+        space=space,
+    )
 
 @router.get("/{owner}/token-accounts")
 def get_token_accounts(owner: str) ->GetTokenAccountsResult:
@@ -132,28 +150,68 @@ def get_signaturesByAddress(owner_address: str) -> SignatureInfo:
     signatures = [item["signature"] for item in data["result"]]
     return SignatureInfo(signatures=signatures)
 
-#Only for Paid Plans
-def get_transactions(wallet_address: str) -> GetTransactionsResult:
+@router.get("/get-transactions-for-address")
+def get_transactions_for_address(
+    wallet_address: str,
+    limit: int = Query(10, ge=1, le=100),
+    pagination_token: str | None = Query(None),
+) -> GetTransactionsResult:
+    """Helius enhanced RPC; requires a plan that includes getTransactionsForAddress."""
     url = f"https://devnet.helius-rpc.com/?api-key={api_key}"
+
+    options: dict = {
+        "transactionDetails": "full",
+        "limit": limit,
+    }
+    if pagination_token:
+        options["paginationToken"] = pagination_token
 
     payload = {
         "jsonrpc": "2.0",
         "id": "1",
         "method": "getTransactionsForAddress",
-        "params": [
-            wallet_address,
-            {
-                "transactionDetails": "signatures",
-                "limit": 10
-            }
-        ]
+        "params": [wallet_address, options],
     }
     headers = {"Content-Type": "application/json"}
 
     response = requests.post(url, json=payload, headers=headers)
     response.raise_for_status()
     data = response.json()
-    print(data)
+    err = data.get("error")
+    if err is not None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=err)
+
+    result = data.get("result") or {}
+    rows = result.get("data") or []
+    pagination = result.get("paginationToken")
+
+    parsed: list[TransactionData] = []
+    for item in rows:
+        tx = item.get("transaction") or {}
+        msg = tx.get("message") or {}
+        meta_raw = item.get("meta") or {}
+        parsed.append(
+            TransactionData(
+                slot=item["slot"],
+                transactionIndex=item["transactionIndex"],
+                transaction=Transaction(
+                    signatures=tx.get("signatures", []),
+                    message=TransactionMessage(
+                        accountKeys=msg.get("accountKeys", []),
+                        instructions=msg.get("instructions", []),
+                        header=msg.get("header"),
+                    ),
+                ),
+                meta=TransactionMeta(
+                    fee=meta_raw.get("fee", 0),
+                    preBalances=meta_raw.get("preBalances", []),
+                    postBalances=meta_raw.get("postBalances", []),
+                ),
+                blockTime=item.get("blockTime"),
+            )
+        )
+
+    return GetTransactionsResult(data=parsed, paginationToken=pagination)
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@ from app.schemas.response_schemas import PrioritizationFee,GetSignatureResult,Si
 from dotenv import load_dotenv
 import os 
 import requests
-from fastapi import APIRouter,HTTPException,status
+from fastapi import APIRouter, HTTPException, Query, status
 load_dotenv()
 
 try:
@@ -66,23 +66,34 @@ def get_signature_status(signature: str) -> GetSignatureResult:
 
 
 @router.get("/get-priorization-fee")
-def prioritization_fee(account_addresses: list[str]) -> PrioritizationFee:
+def prioritization_fee(
+    account_addresses: list[str] = Query(default=[]),
+) -> PrioritizationFee:
     url = f"https://devnet.helius-rpc.com/?api-key={api_key}"
 
     payload = {
         "jsonrpc": "2.0",
         "id": "1",
         "method": "getRecentPrioritizationFees",
-        "params": [["CxELquR1gPP8wHe33gZ4QxqGB3sZ9RSwsJ2KshVewkFY"]]
+        "params": [account_addresses if account_addresses else []]
     }
     headers = {"Content-Type": "application/json"}
 
     response = requests.post(url, json=payload, headers=headers)
-    data=response.json()
-    slot = data["result"][0]["slot"]
-    fee = data["result"][0]["prioritizationFee"]
-    pFee = PrioritizationFee(current_slot=slot,prioritization_fee=fee)
-    return pFee 
+    response.raise_for_status()
+    data = response.json()
+    err = data.get("error")
+    if err is not None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=err)
+    rows = data.get("result") or []
+    if not rows:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Empty prioritization fee result from RPC",
+        )
+    slot = rows[0]["slot"]
+    fee = rows[0]["prioritizationFee"]
+    return PrioritizationFee(current_slot=slot, prioritization_fee=fee)
 
 
 
